@@ -1,0 +1,395 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage{latexsym,amssymb,enumerate,amsmath,epsfig,amsthm}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace,color}
+\usepackage{graphics}
+\usepackage{subfigure}
+
+%\newcommand{\x}{\mathbf{x}}
+%\newcommand{\y}{\mathbf{y}}
+%\newcommand{\bv}{\mathbf{v}}
+%\newcommand{\n}{\mathbf{n}}
+%\newcommand{\colored}[1]{\textcolor{red}{#1}}
+%\newtheorem{thm}{Theorem}[section]
+%\newtheorem{prop}{Proposition}[section]
+%\newtheorem{obser}{Observation}[section]
+%\newtheorem{corollary}{Corollary}[section]
+
+%\doublespacing
+
+\title{Modeling and Controlling of an Inverted Pendulum System with Simulation}
+\author{
+Xingzhou CHEN \thanks{Department of Electronic and Computer Engineering, the Hong Kong University of Science and Technology, Clear Water Bay, Hong Kong. Email: {\bf xchenfk@connect.ust.hk}}  
+}
+
+\markboth{S. Leung}{MATH5311 Final Project}
+\pagestyle{myheadings}
+
+\begin{document}
+\thispagestyle{plain}
+\maketitle
+
+\begin{abstract}
+In this project, I model an inverted pendulum system, which can be formulated as a multi-variable second-order ordinary differential equation. 
+In addition, I use the different numerical method to simulate how the system would change dynamically. Further, to keep the system in balance,
+I apply "linear quadratic regulator"(LQR) method and get a numerical solution of the feedback gain. The result demonstrates the convergence of
+our numerical scheme.
+
+\end{abstract}
+
+\section{Introduction}
+Dynamic balance control problem is a fundamental problem in control theory. With the rise of drones and robotic dogs, how to maintain dynamic balance 
+in complex dynamic systems has become a research frontier. In order to solve these problems, we need to formualte a model first, then approximate 
+and simulate the system, and select the appropriate algorithm for balance control. \\
+In this project, I apply "linear quadratic regulator"(LQR) to 
+the inverted pendulum system, which is an absolute-unstable, high-order, multi-variables and strong-coupled system. In second section, the inverted pendulum 
+system and the LQR algorithm are briefly introduced. With numerical methods, the third section shows the simulation of the dynamic system and the solution of 
+feedback gain in the LQR algorithm. In forth section, I present the results and discuss them.
+\begin{figure}[!htb]
+	\centerline{
+		\psfig{figure=picture/Inverted.jpeg,width=2.0in}
+	}
+	\caption{Inverted pendulum system}
+	\label{Figure:Cart with inverted pendulum}
+\end{figure}
+
+\section{Inverted pendulum system and Linear quadratic regulator}
+\subsection{Inverted pendulum system}
+Consider a cart with an inverted pendulum hinged on top of it as shown in Figure.\ref{Figure:Cart with inverted pendulum}. 
+For simplicity, the cart and the pendulum are assumed to move in only one plane, and the friction, the mass of the stick, and the gust of wind are disregarded.
+The problem is to maintain the pendulum at the vertical position.\cite{chen1999linear} And the physical symbol is shown in Table \ref{tab:symbol}.
+\begin{table}[!htbp]
+	\centering
+	\caption{\textbf{the symbol of physical model}} \label{tab:symbol}
+	\begin{tabular}{lll}
+	\multicolumn{1}{l|}{Symbol} & Physical meaning            & Value                     \\ \hline
+	\multicolumn{1}{l|}{$M$}      & the quality of the cart              &  0.5      \\
+	\multicolumn{1}{l|}{$m$}      & the quality of the pendulum           & 0.2       \\
+	\multicolumn{1}{l|}{$l$}      & the length of the stick                 & 0.3     \\
+	\multicolumn{1}{l|}{$I$}      & the moment of inertia of the pendulum and stick  0.006 \\
+	\multicolumn{1}{l|}{$c$}      & the rotational friction coefficient of the stick  \\
+	\multicolumn{1}{l|}{$F$}      & the force applied to the cart                   \\
+	\multicolumn{1}{l|}{$x$}      & the displacement of the cart                      \\
+	\multicolumn{1}{l|}{$\theta$}	   & the angle between the normal and the stick      \\
+	\multicolumn{1}{l|}{$g$}	   & acceleration of gravity                         & 10      
+	\end{tabular}
+\end{table}
+\\
+Let $P$ and $N$ be, respectively, the horizontal and vertical forces exerted by the cart on the pendulum as shown. The application of Newton’s law to the linear movements yields
+\begin{figure}[!hbt]
+	\centering
+	\mbox{
+	(a)\subfigure{\psfig{figure=picture/force_1.png,width=2.6in}} \quad\quad
+	(b)\subfigure{\psfig{figure=picture/force_2.png,width=1.2in}}
+	}
+	\vspace{15pt}
+	\caption{The horizontal and vertical forces}
+	\label{Figure:The horizontal and vertical forces}
+\end{figure}
+\\
+In the horizontal direction, the cart and the pendulum satisfies the following equation
+\begin{equation}
+	M \ddot{x} = F-N.	\label{Eqn:1}
+\end{equation}
+\begin{equation}
+	N = m{(x+l\sin{\theta})}'' = m\ddot{x} + ml\ddot{\theta}\cos{\theta} - ml\dot{\theta}^2\sin{\theta}. \label{Eqn:2} 
+\end{equation}
+In the vertical direction, the pendulum satisfies the following equation
+\begin{equation}
+	P-mg = -ml(1-\cos{\theta})'' = -ml\ddot{\theta}\sin{\theta}-ml\dot{\theta}^2\cos{\theta}.	\label{Eqn:3}
+\end{equation}
+The torque balance equation for the pendulum and the stick is as follows
+\begin{equation}
+	Pl\sin{\theta}-Nl\cos{\theta} - c\dot{\theta} = I\ddot{\theta}.	\label{Eqn:4}
+\end{equation}
+Combined the equation (\ref{Eqn:1})(\ref{Eqn:2})(\ref{Eqn:3})(\ref{Eqn:4}), $P$ and $N$ can be eliminated and get following equation
+\begin{eqnarray}
+	F &=& (M+m)\ddot{x} + ml\ddot{\theta}*\cos{\theta} - ml\dot{\theta}^2\sin{\theta} \, , \nonumber \\ 
+	mgl\sin{\theta} &=& (I+ml^2)\ddot{\theta} + ml\ddot{x}\cos{\theta} + c\dot{\theta}.
+\end{eqnarray}
+
+\subsection{Linear quadratic regulator}
+\begin{figure}[!htb]
+	\centerline{
+		\psfig{figure=picture/lqr.png,width=3.0in}
+	}
+	\caption{dynamic system with feedback gain K}
+	\label{Figure:LQR}
+\end{figure}
+The Linear Quadratic Regular (LQR) problem is a canonical problem in the theory of optimal control, 
+partially due to the fact that it has analytical solutions that can be derived using a variety of methods, 
+and from the fact that LQR is an extremely useful tool in practice.\\
+The continuous-time LQR problem is formulated as\cite{kamien2012dynamic}
+\begin{eqnarray}	
+	&\min_{u(t)}& {\frac{1}{2}x^{T}(t_f)Q(t_f)x(t_f)+\frac{1}{2}\int_{t_f}^{0}[x^{T}(t)Q(t)x(t)+u^{T}(t)R(t)u(t)]} \, , \nonumber \\ 
+	&s.t.& \dot{x}(t) = A(t)x(t)+B(t)u(t). \label{Eqn:6}
+\end{eqnarray}
+where $R$ is a real, symmetric, positive-definite matrix and $Q$ is a real, symmetric, positive semi-definite matrix.
+And we define the cost function and the minimum cost function
+\begin{equation}
+	J(x(t),u(t),t) = l(x(t_f),t)+\int_{0}^{t_f}l(x(t),u(t),t)\mathrm{d}t.	\label{Eqn:7}
+\end{equation}
+\begin{equation}
+	J^*(x(t),t) = \min_{u(t)}{J(x(t),u(t),t)}.	\label{Eqn:8}
+\end{equation}
+According to the optimal principle in dynamic system, the terminal of the optimal trajectory is still optimal. We can get the following equation
+\begin{equation}
+	J^*(x(t),t) = \min_{u(t)}{\{\int_{t}^{t'} l(x(\gamma),u(\gamma),\gamma)\mathrm{d}\gamma+J^*(x(t'),t')\}}.	\label{Eqn:9}
+\end{equation}
+Assume that the cost function is continuous and differentiable, and we can get its Taylor expand
+\begin{equation}
+	J^*(x',t') = J^*(x,t)+\frac{\partial J^{*T}(x,t)}{\partial x}\dot{x}\Delta t + \frac{\partial J^*(x,t)}{\partial t}\Delta t + o(\Delta t^2) 	\label{Eqn:10}
+\end{equation}
+Next, we can assume $\Delta t \to 0$, and take equation(\ref{Eqn:10}) into equation(\ref{Eqn:9})
+\begin{equation}
+	J^*(x,t) = \min_{u(t)}{\{l(x(t),u(t),t)\mathrm{d}t+J^*(x,t)+\frac{\partial J^{*T}(x,t)}{\partial x}\dot{x}\Delta t + \frac{\partial J^*(x,t)}{\partial t}\Delta t\}}.	\label{Eqn:11}
+\end{equation}
+simplify the equation(\ref{Eqn:11}), and get the famous Hamilton-Jacobi-Bellman equation
+\begin{equation}
+	0 = J_t^*(x,t) + \min_{u(t)}{\{l(x(t),u(t),t)+J_{x}^{*T}(x,t)\dot{x}\}}.	\label{Eqn:12}
+\end{equation}
+We now use these to solve the continuous LQR problem. From the equation\ref{Eqn:12}, we calculate $u^*(t)$ of the minimum cost function
+\begin{equation}
+	\frac{\partial (\frac{1}{2}x^TQx +\frac{1}{2}u^TRu+J_{x}^{*T}(x,t)(Ax+Bu))}{\partial u}=0 \Longrightarrow u^{*} = -R^{-1}B^TJ^*_x .	\label{Eqn:13}
+\end{equation}
+Since the HJB equation in this case is a first-order partial differential equation of the minimum cost, we need to guess a solution, which we assume to be quadratic:
+\begin{equation}
+	J^*(x(t),t) = \frac{1}{2}x^T(t)K(t)x(t).	\label{Eqn:14}
+\end{equation}
+where $K(t)$ is a symmetric positive-definite matrix.\\
+Plugging these into the HJB equation we get the Riccati equation:
+\begin{equation}
+	0 = \frac{1}{2}x^T[\dot K + Q -K^TBR^{-1}B^TK+2KA]x \Longrightarrow 0 = \dot K + Q -K^TBR^{-1}B^TK+2KA. \label{Eqn:15} 
+\end{equation}
+When solved for $K(t)$ using a specialized Riccati solver, the optimal control law is given by
+\begin{equation}
+	u^{*}(t) = -R^{-1}B^T(t)K(t)x(t) \label{Eqn:16} 
+\end{equation}
+
+\section{Numerical Methods}
+\subsection{simulation of inverted pendulum system}
+\subsubsection{ODE}
+In the last chapter, the inverted pendulum system has been formulated as follows
+\begin{eqnarray}
+	F &=& (M+m)\ddot{x} + ml\ddot{\theta}\cos{\theta} - ml\dot{\theta}^2\sin{\theta} \, , \nonumber \\ 
+	mgl\sin{\theta} &=& (I+ml^2)\ddot{\theta} + ml\ddot{x}\cos{\theta} + c\dot{\theta}. \label{Eqn:17}
+\end{eqnarray} 
+\\
+However, from equation(\ref{Eqn:17}), we can't explicitly know how displacement $x$ and angle $\theta$ change over time.
+If we want to simulate this dynamic system, untying the couple of $\ddot{x}$ and $\ddot{\theta}$ is a must.
+For that reason, we turn the equation(\ref{Eqn:17}) to
+\begin{eqnarray}
+	\ddot{x} &=& \frac{mlc\dot{\theta}\cos{\theta} + (I+ml^2)ml\dot{\theta}^2\sin{\theta} -m^2l^2g\cos{\theta}\sin{\theta} + (I+ml^2)F}   {(I+ml^2)(M+m) - m^2l^2\cos^2{\theta}} \, , \nonumber \\ 
+	\ddot{\theta} &=& \frac{(M+m)mgl\sin{\theta} -m^2l^2\dot{\theta}^2\sin{\theta}\cos{\theta} -(M+m)c\dot{\theta}-mlF}   {(I+ml^2)(M+m) - m^2l^2\cos^2{\theta}}. \label{Eqn:18}
+\end{eqnarray} 
+Now, we face a higher order initial value problem. Futher, we can consider this system as a system of 4 ODE's with 4 initial conditions.
+Define $ [x_1,x_2,x_3,x_4] = [x,\dot x,\theta, \dot \theta]$
+\begin{eqnarray}
+	\dot{x_1} &=& x_2 \, , \nonumber \\
+	\dot{x_2} &=& \frac{mlcx_4\cos{x_3} + (I+ml^2)mlx_4^2\sin{x_3} -m^2l^2g\cos{x_3}\sin{x_3} + (I+ml^2)F}   {(I+ml^2)(M+m) - m^2l^2\cos^2{x_3}} \, , \nonumber \\ 
+	\dot{x_3} &=& x_4 \, , \nonumber \\
+	\dot{x_4} &=& \frac{(M+m)mgl\sin{x_3} -m^2l^2x_4^2\sin{x_3}\cos{x_3} -(M+m)cx_4-mlF}   {(I+ml^2)(M+m) - m^2l^2\cos^2{x_3}}. \label{Eqn:19}
+\end{eqnarray} 
+\subsubsection{2nd order Runge-Kutta Methods}
+We use 2nd order Runge-Kutta method\cite{burden2011numerical} to calculate $w = [x,\dot x,\theta, \dot \theta]$, and the scheme is as follows
+\begin{eqnarray}
+	w_{i+\frac{1}{2}} &=& w_{i}+\frac{h}{2}f(t_i,w_i) \, , \nonumber \\
+	w_{i+1} &=& w_i+hf(t_{i+\frac{1}{2}},w_{i+\frac{1}{2}}). \label{Eqn:23}
+\end{eqnarray}
+In order to ensure the convergence, we analyze consistence and 0-stability seperately.
+We analyze the consistence first
+\begin{eqnarray}
+\frac{\tau_{i+1}}{h} = \frac{y_{i+1}-w_{i+1}}{h} &=& {y_i}'+ \frac{h}{2}{y_i}'' + O(h^2)-f(t+\frac{h}{2},w_i+\frac{h}{2}f(t_i,w_i))  \nonumber \\
+& =& {y_i}'+\frac{h}{2}(f_t+f_wy')+O(h^2)-f-\frac{h}{2}f_t-\frac{h}{2}f_wf+O(h^2)   \nonumber\\
+& =& O(h^2)  \nonumber
+\end{eqnarray}
+Then analyze the 0-stability. In real world, $\dot \theta$ exist the maximum. It's easy to prove when $|w_{i,4}| \le C $, $|f(t,w)-f(t,\bar{w})| \le L|w-\bar{w}|$. Since
+\begin{eqnarray}
+	&&|f(t+\frac{h}{2},w+\frac{h}{2}f(t,w))-f(t+\frac{h}{2},\bar w+\frac{h}{2}f(t,\bar w))|   \nonumber\\
+	&\le & L|w+\frac{h}{2}f(t,w)-\bar w-\frac{h}{2}f(t,\bar w))|  \nonumber \\
+	&\le& hL|w-\bar w|+\frac{Lh}{2}|f(t,w)-f(t,\bar w)|  \nonumber \\
+	&\le& (L+\frac{hL^2}{2})|w-\bar w| \nonumber
+\end{eqnarray}
+2nd order Runge-Kutta method is 0-stable and consistent, so it will convergent unless $\dot \theta \to \infty$.
+
+\subsection{solution of LQR algorithm}
+\subsubsection{ODE}
+In the last chapter, we turn the LQR solution of optimal control law into solution of Riccati equation. However, this algorithm can only apply
+to linear systems, like formulation (\ref{Eqn:6}). Naturally, we approximate this system as a linear system, which is linearized near the equilibrium point.
+\\
+Near the balance point, $\theta \approx 0, \sin{\theta} \approx 0, \cos{\theta} \approx 1$. We can linearize the system formualtion(\ref{Eqn:17})
+\begin{eqnarray}
+	F &=& (M+m)\ddot{x} + ml\ddot{\theta} \, , \nonumber \\ 
+	mgl\theta &=& (I+ml^2)\ddot{\theta} + ml\ddot{x} + c\dot{\theta}. \label{Eqn:20}
+\end{eqnarray} 
+Then we untie the couple of $\ddot{x}$ and $\ddot{\theta}$ from equation(\ref{Eqn:20})
+\begin{eqnarray}
+\ddot{x} &=& \frac{mlc\dot{\theta} -m^2l^2g\theta + (I+ml^2)F}   {(I+ml^2)(M+m) - m^2l^2} \, , \nonumber \\ 
+\ddot{\theta} &=& \frac{(M+m)mgl\theta -(M+m)c\dot{\theta}-mlF}   {(I+ml^2)(M+m) - m^2l^2}. \label{Eqn:21}
+\end{eqnarray}
+Next, we reduce the order of ODE equation(\ref{Eqn:21}) by increasing the number of variables. Define $ [x_1,x_2,x_3,x_4] = [x,\dot x,\theta, \dot \theta]$
+\begin{eqnarray}
+	\dot{\begin{bmatrix}
+		x_1 \\
+		x_2 \\
+		x_3 \\
+		x_4
+		\end{bmatrix}} 
+		=
+		\frac{\begin{bmatrix}
+		 0 & 1 & 0 & 0\\
+		 0 & 0 & -m^2l^2g & mlc\\
+		 0 & 0 & 0 & 1\\
+		 0 & mlb & (M+m)mgl & -(M+m)c
+		\end{bmatrix}}{(M+m)(I+ml^2)-m^2l^2}
+		\begin{bmatrix}
+		x_1 \\
+		x_2 \\
+		x_3 \\
+		x_4
+		\end{bmatrix}
+		+\frac{\begin{bmatrix}
+		0 \\
+		I+ml^2 \\
+		0 \\
+		-ml
+		\end{bmatrix}}{(M+m)(I+ml^2)-m^2l^2}F \label{Eqn:22} 
+\end{eqnarray}
+Now, we obtain the matrix $A$ and matrix $B$ in Riccati equation(\ref{Eqn:15}). If we solve this Riccati equation, we can directly get the optimal control law.
+\begin{eqnarray}
+	\dot K  = - Q + K^TBR^{-1}B^TK - 2KA 
+\end{eqnarray}
+where
+\begin{eqnarray}
+	A = \frac{\begin{bmatrix}
+		0 & 1 & 0 & 0\\
+		0 & 0 & -m^2l^2g & mlc\\
+		0 & 0 & 0 & 1\\
+		0 & mlb & (M+m)mgl & -(M+m)c
+	   \end{bmatrix}}{(M+m)(I+ml^2)-m^2l^2} &,&
+	B = \frac{\begin{bmatrix}
+		0 \\
+		I+ml^2 \\
+		0 \\
+		-ml
+		\end{bmatrix}}{(M+m)(I+ml^2)-m^2l^2}
+\end{eqnarray}
+\subsubsection{2nd order Runge-Kutta Methods}
+Because for dynamic programming, what we know is the initial value of end point, so we need to reverse the 
+integral from $K(T) = 0$. The numerical scheme is as follows
+\begin{eqnarray}
+	w_{i-\frac{1}{2}} &=& w_{i}-\frac{h}{2}f(t_i,w_i) \, , \nonumber \\
+	w_{i-1} &=& w_i-hf(t_{i-\frac{1}{2}},w_{i-\frac{1}{2}}). \label{Eqn:24}
+\end{eqnarray}
+The proof of convergence in 2nd order Runge-Kutta method is mentioned in 3.1.2. Now, we discuss the situation that $f(t,w)$ satisfy Lipschitz continuity.
+\begin{eqnarray}
+	\frac{\partial (- Q + K^TBR^{-1}B^TK - 2KA)}{\partial K} =2K^TBR^{-1}B^T-2A \nonumber
+\end{eqnarray}
+If $|K| \le \infty$ all the time, this numerical scheme will convergent.
+
+\section{Results}
+This project implements in python, and dynamic results with more detail can be seen example.gif.
+\subsection{simulation of dynamic system with zero-input}
+In this part, we simulate the inverted pendulum system without force F, because we can visually observe the 
+effect of our numerical scheme through the law of energy conservation. 
+\subsubsection{example1}
+In the first example, I set the rotational friction coefficient $c=0$ and the force of cart $F=0$. In 
+this condition, the inverted pendulum system observe the energy conservation. In other word, this system are supposed 
+to show periodicity and symmetry.
+\begin{figure}[!hbt]
+	\centering
+	\mbox{
+	(a)\subfigure{\psfig{figure=picture/init_3.png,width=1.8in}}
+	(b)\subfigure{\psfig{figure=picture/trajectory_1.png,width=2.0in}}
+	(c)\subfigure{\psfig{figure=picture/angle_1.png,width=2.0in}}
+	}
+	\vspace{15pt}
+	\caption{$T=10, c=0, F(t)=0, x(0) = 0, \theta(0)=0.1$}
+	\label{Figure:example1}
+\end{figure}
+\subsubsection{example2}
+In the second example, we consider the rotational friction coefficient $c\ne 0$.
+In this condition, the energy of inverted pendulum system gradually decays, and system are supposed to reach the equilibrium point $\theta = \pi$.
+\begin{figure}[!hbt]
+	\centering
+	\mbox{
+	(a)\subfigure{\psfig{figure=picture/init_3.png,width=1.8in}}
+	(b)\subfigure{\psfig{figure=picture/trajectory_2.png,width=2.0in}}
+	(c)\subfigure{\psfig{figure=picture/angle_2.png,width=2.0in}}
+	}
+	\vspace{15pt}
+	\caption{$T=10, c=0.1, F(t)=0, x(0) = 0, \theta(0)=0.1$}
+	\label{Figure:example2}
+\end{figure}
+\subsection{LQR algorithm to keep balance}
+In this part, we get the force of cart $F(t)=-R^{-1}B^T(t)K(t)x(t)$ through the optimal control law $K$ and current system state varables $x$.
+We implement this force to the original system to stabilize the system at an unstable equilibrium point $\theta = 0$.
+\subsubsection{example3}
+In the third eaxmple, we care about the angle of the stick and the velocity of the cart, which are supposed to stabilize in $\theta = 0,\dot{x} = 0$.
+In this condition, we set 
+$Q = \begin{bmatrix}
+	0 & 0 &0  & 0\\
+	0 & 1 &0  & 0\\
+	0 & 0 & 1 & 0\\
+	0 & 0 & 0 & 1
+   \end{bmatrix}, R = 1$.
+\begin{figure}[!hbt]
+	\centering
+	\mbox{
+	(a)\subfigure{\psfig{figure=picture/init_3.png,width=1.8in}} 
+	(b)\subfigure{\psfig{figure=picture/trajectory_3.png,width=2.0in}}
+	(c)\subfigure{\psfig{figure=picture/angle_3.png,width=2.0in}}
+	}
+	\vspace{15pt}
+	\caption{$T=10, c=0.0, x(0) = 0, \dot{x}(0) = 0,\theta(0)=0.5, \dot{\theta}(0)=0$}
+	\label{Figure:example3}
+\end{figure}
+
+\subsubsection{example4}
+In the forth eaxmple, we not only care about the angle and the velocity, but also the location where the cart finally stay. 
+This means pendulum system are supposed to stabilize in $\theta = 0, x = 0$. In this condition, we set 
+$Q = \begin{bmatrix}
+	1 & 0 &0  & 0\\
+	0 & 1 &0  & 0\\
+	0 & 0 & 1 & 0\\
+	0 & 0 & 0 & 1
+   \end{bmatrix}, R = 1$
+, and give the cart an initial speed.
+\begin{figure}[!hbt]
+	\centering
+	\mbox{
+	(a)\subfigure{\psfig{figure=picture/init_4.png,width=1.8in}}
+	(b)\subfigure{\psfig{figure=picture/trajectory_4.png,width=2.0in}}
+	(c)\subfigure{\psfig{figure=picture/angle_4.png,width=2.0in}}
+	}
+	\vspace{15pt}
+	\caption{$T=10, c=0.0, x(0) = -2, \dot{x}(0) = 2,\theta(0)=1, \dot{\theta}(0)=0$}
+	\label{Figure:example4}
+\end{figure}
+
+\section{Conclusions}
+In this project, I first model an inverted pendulum system, then transforme these equation into the familiar ODE, and finally solved it with the 2nd order Runge-Kutta method.
+What interests me most is how to solve equations stably and accurately simulate a dynamic system.
+\\
+However, there are also some remaining issues in this project. For example, since we approximate the system as a linear system in control law design, 
+the LQR algorithm fails when the pendulum moves away from the equilibrium point, like picture(\ref{Figure:example5})~
+\begin{figure}[!hbt]
+	\centering
+	\mbox{
+	(a)\subfigure{\psfig{figure=picture/init_5.png,width=1.8in}}
+	(b)\subfigure{\psfig{figure=picture/trajectory_5.png,width=2.0in}}
+	(c)\subfigure{\psfig{figure=picture/angle_5.png,width=2.0in}}
+	}
+	\vspace{15pt}
+	\caption{$T=10, c=0.0, x(0) = 0, \dot{x}(0) = 0,\theta(0)=1.5, \dot{\theta}(0)=0$}
+	\label{Figure:example5}
+\end{figure}
+
+
+% \begin{thebibliography}{10}
+% \bibitem{baker90}{\sc G.~L. Baker, \& J.~P. Gollub}, {\em Chaotic Dynamics}, Cambridge University Press, 1990.
+% \bibitem{lamport94}{\sc L.~Lamport}, {\em \LaTeX: A document preparation system}, Addison Wesley Publishing Company, 1994.
+% \end{thebibliography}
+\bibliographystyle{plain}
+\bibliography{ref}
+\end{document}
